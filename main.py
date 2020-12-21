@@ -1,19 +1,18 @@
 import numpy as np
 import pandas as pd
-from DatasetParser import parse
+
 from Adaboost import Adaboost
 
 if __name__ == '__main__':
-    hc_dataset = parse("HC_Body_Temperature.txt")
-    iris_dataset = np.array(parse("iris.data"), dtype=object)
+    hc_dataset = pd.read_csv('HC_Body_Temperature.txt', sep="\s+", header=None, names=["x", "label", "y"], dtype=float)
+    for index in range(0, len(hc_dataset)):
+        if hc_dataset['label'][index] > 1:
+            hc_dataset['label'][index] = -1
+
     # print(hc_dataset)
-    # print(iris_dataset)
 
-    for i in range(len(iris_dataset)):
-        print(iris_dataset[i][0])
+    adaboost = Adaboost()
 
+    adaboost.fit(np.array(hc_dataset['x']), np.array(hc_dataset['y']), np.array(hc_dataset['label']))
 
-clf = Adaboost(8)
-
-# clf.fit(iris_dataset[:, 0], iris_dataset[:, 1])
-# print(clf.classifiers)
+    print(len(adaboost.classifiers))

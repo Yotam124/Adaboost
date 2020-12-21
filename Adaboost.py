@@ -4,21 +4,28 @@ import numpy as np
 class Classifier:
     def __init__(self):
         self.direction_label = 1
-        self.feature_column = None
         self.threshold = None
         self.alpha = None
 
-    def predict(self, features):
-        points_size = features.shape[0]
-        current_column = features[:, self.feature_column]
+    def predict(self, features_x, features_y):
+        points_size = features_x.shape[0]
         predictions = np.ones(points_size)
 
         if self.direction_label == 1:
-            predictions[current_column < self.threshold] = -1
+            predictions[features_y < self.threshold(features_x)] = -1
         else:
-            predictions[current_column > self.threshold] = -1
+            predictions[features_y > self.threshold(features_x)] = -1
 
         return predictions
+
+
+def linear_equation(x1, y1, x2, y2):
+    def linear_threshold(x):
+        if x2-x1 == 0:
+            return 0
+        return (x - x1) * ((y2 - y1) / (x2 - x1)) + y1
+
+    return linear_threshold
 
 
 class Adaboost:
@@ -27,43 +34,44 @@ class Adaboost:
         self.classifiers = []
         self.n_clf = n_clf
 
-    def fit(self, features, labels):
-        points_size, features_size = labels.shape
+    def fit(self, features_x, features_y, labels):
+        points_size = labels.shape[0]
 
         weights = np.full(points_size, 1 / points_size)
 
         self.classifiers = []
 
-        for _ in range(self.n_clf):
+        for pointA in range(points_size):
             clf = Classifier()
-
             min_err = float('inf')
-            for feature_i in range(features_size):
-                features_column = features[:, feature_i]
-                thresholds = np.unique(features_column)
 
-                for threshold in thresholds:
-                    p = 1
-                    predictions = np.ones(points_size)
-                    predictions[features_column < threshold] = -1
+            for pointB in range(points_size):
+                if pointA == pointB:
+                    continue
 
-                    misclassified = weights[labels != predictions]
-                    err = sum(misclassified)
+                threshold = linear_equation(features_x[pointA], features_y[pointA], features_x[pointB],
+                                                 features_y[pointB])
 
-                    if err > 0.5:
-                        err = 1 - err
-                        p = -1
+                p = 1
+                predictions = np.ones(points_size)
+                predictions[features_y < threshold(features_x)] = -1
 
-                    if err < min_err:
-                        clf.direction_label = p
-                        clf.threshold = threshold
-                        clf.feature_column = feature_i
-                        min_err = err
+                misclassified = weights[labels != predictions]
+                err = sum(misclassified)
+
+                if err > 0.5:
+                    err = 1 - err
+                    p = -1
+
+                if err < min_err:
+                    clf.direction_label = p
+                    clf.threshold = threshold
+                    min_err = err
 
                 EPS = 1e-10
                 clf.alpha = 0.5 * np.log((1.0 - min_err + EPS) / (min_err + EPS))
 
-                predictions = clf.predict(features)
+                predictions = clf.predict(features_x, features_y)
 
                 weights *= np.exp(-clf.alpha * labels * predictions)
 
@@ -71,9 +79,11 @@ class Adaboost:
 
                 self.classifiers.append(clf)
 
-        # def predict(self, features):
-        #     clf_preds = [clf.alpha * clf.predict(features) for clf in self.classifiers]
-        #     labels_pred = np.sum(clf_preds)
-        #     labels_pred = np.sign(labels_pred)
-        #
-        #     return labels_pred
+
+
+    # def predict(self, features):
+    #     clf_preds = [clf.alpha * clf.predict(features) for clf in self.classifiers]
+    #     labels_pred = np.sum(clf_preds)
+    #     labels_pred = np.sign(labels_pred)
+    #
+    #     return labels_pred
