@@ -21,7 +21,7 @@ class Classifier:
 
 def linear_equation(x1, y1, x2, y2):
     def linear_threshold(x):
-        if x2-x1 == 0:
+        if x2 - x1 == 0:
             return 0
         return (x - x1) * ((y2 - y1) / (x2 - x1)) + y1
 
@@ -34,52 +34,49 @@ class Adaboost:
         self.classifiers = []
         self.n_clf = n_clf
 
+    def find_all_possible_lines(self, features_x, features_y):
+        points_size = features_x.shape[0]
+        for pointA in range(points_size):
+            for pointB in range(pointA + 1, points_size):
+                clf = Classifier()
+                clf.threshold = linear_equation(features_x[pointA], features_y[pointA], features_x[pointB],
+                                                features_y[pointB])
+                self.classifiers.append(clf)
+                # print("pointA, pointB: ", "(", features_x[pointA], ",", features_y[pointA], ")", "(",
+                #       features_x[pointB], ",", features_y[pointB], ")")
+
     def fit(self, features_x, features_y, labels):
         points_size = labels.shape[0]
 
         weights = np.full(points_size, 1 / points_size)
 
-        self.classifiers = []
+        for clf in self.classifiers:
 
-        for pointA in range(points_size):
-            clf = Classifier()
             min_err = float('inf')
 
-            for pointB in range(points_size):
-                if pointA == pointB:
-                    continue
+            p = 1
+            predictions = np.ones(points_size)
+            predictions[features_y < clf.threshold(features_x)] = -1
 
-                threshold = linear_equation(features_x[pointA], features_y[pointA], features_x[pointB],
-                                                 features_y[pointB])
+            misclassified = weights[labels != predictions]
+            err = sum(misclassified)
 
-                p = 1
-                predictions = np.ones(points_size)
-                predictions[features_y < threshold(features_x)] = -1
+            if err > 0.5:
+                err = 1 - err
+                p = -1
 
-                misclassified = weights[labels != predictions]
-                err = sum(misclassified)
+            if err < min_err:
+                clf.direction_label = p
+                min_err = err
 
-                if err > 0.5:
-                    err = 1 - err
-                    p = -1
+            eps = 1e-10
+            clf.alpha = 0.5 * np.log((1.0 - min_err + eps) / (min_err + eps))
 
-                if err < min_err:
-                    clf.direction_label = p
-                    clf.threshold = threshold
-                    min_err = err
+            predictions = clf.predict(features_x, features_y)
 
-                EPS = 1e-10
-                clf.alpha = 0.5 * np.log((1.0 - min_err + EPS) / (min_err + EPS))
+            weights *= np.exp(-clf.alpha * labels * predictions)
 
-                predictions = clf.predict(features_x, features_y)
-
-                weights *= np.exp(-clf.alpha * labels * predictions)
-
-                weights /= np.sum(weights)
-
-                self.classifiers.append(clf)
-
-
+            weights /= np.sum(weights)
 
     # def predict(self, features):
     #     clf_preds = [clf.alpha * clf.predict(features) for clf in self.classifiers]
